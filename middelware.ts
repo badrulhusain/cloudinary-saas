@@ -1,40 +1,43 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-const isPubliRoute=createRouteMatcher([
-    '/sign-in',
-    '/sign-up',
-    '/',
-    '/home',
+const isPublicRoute = createRouteMatcher([
+    "/sign-in",
+    "/sign-up",
+    "/",
+    "/home"
+])
+const isPublicApiRoute = createRouteMatcher([
+    "/api/videos"
 ])
 
-const isPublicAPIRoute=createRouteMatcher([
-    '/api/videos'
-])
 
+export default clerkMiddleware((auth, req) => {
+    const {userId} = auth();
+    const currentUrl = new URL(req.url)
+     const isAccessingDashboard = currentUrl.pathname === "/home"
+     const isApiRequest = currentUrl.pathname.startsWith("/api")
 
-export default clerkMiddleware((auth,req)=>{
-    const {userId}:any=auth();
-    const CurrentURL=new URL(req.url);
-    const isHomePage=CurrentURL.pathname==='/home';
-     const isAPIRequest=CurrentURL.pathname.startsWith('/api');
-   if(userId && isPubliRoute(req) && !isHomePage ){
-   return NextResponse.redirect(new URL('/home', req.url));
-   }
+     // If user is logged in and accessing a public route but not the dashboard
+    if(userId && isPublicRoute(req) && !isAccessingDashboard) {
+        return NextResponse.redirect(new URL("/home", req.url))
+    }
+    //not logged in
+    if(!userId){
+        // If user is not logged in and trying to access a protected route
+        if(!isPublicRoute(req) && !isPublicApiRoute(req) ){
+            return NextResponse.redirect(new URL("/sign-in", req.url))
+        }
 
-   // not loggdin
-   if(isAPIRequest && !isPublicAPIRoute(req)){
-    return NextResponse.redirect(new URL('/sign-in', req.url));
+        // If the request is for a protected API and the user is not logged in
+        if(isApiRequest && !isPublicApiRoute(req)){
+            return NextResponse.redirect(new URL("/sign-in", req.url))
+        }
+    }
+    return NextResponse.next()
 
-   }
-   if(isAPIRequest && !isPublicAPIRoute(req)){
-    return NextResponse.redirect(new URL('/sign-in', req.url));
-
-   }
-   return NextResponse.next();
 })
 
 export const config = {
-  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"]
-
-}
+  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
+};
